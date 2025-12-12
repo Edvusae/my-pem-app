@@ -245,11 +245,11 @@ export default function LoginPage() {
           >
             {isLogin ? (
               <>
-                Don't have an account?{' '}
+                Don&apos;t have an account?{' '}
                 <span className="font-semibold">Sign Up</span>
               </>
             ) : (
-              <>
+              <> 
                 Already have an account?{' '}
                 <span className="font-semibold">Sign In</span>
               </>
