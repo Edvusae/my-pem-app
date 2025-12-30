@@ -1,34 +1,8 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-
-// This would typically come from your database
-// For now, using in-memory storage for demonstration
-interface User {
-  id: string;
-  email: string;
-  password: string;
-  name: string;
-  role: "admin" | "user";
-}
-
-// Mock user database - Replace with actual database queries
-const users: User[] = [
-  {
-    id: "1",
-    email: "admin@example.com",
-    password: "$2a$10$YourHashedPasswordHere", // "admin123" hashed
-    name: "Admin User",
-    role: "admin"
-  },
-  {
-    id: "2",
-    email: "user@example.com",
-    password: "$2a$10$YourHashedPasswordHere", // "user123" hashed
-    name: "Regular User",
-    role: "user"
-  }
-];
+import dbConnect from "./mongodb";
+import User from "./models/User";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -36,21 +10,21 @@ export const authOptions: NextAuthOptions = {
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error("Invalid credentials");
+          throw new Error("Email and password required");
         }
 
-        // Find user in database
-        const user = users.find(u => u.email === credentials.email);
+        await dbConnect();
+
+        const user = await User.findOne({ email: credentials.email });
 
         if (!user) {
-          throw new Error("User not found");
+          throw new Error("No user found with this email");
         }
 
-        // Verify password
         const isPasswordValid = await bcrypt.compare(
           credentials.password,
           user.password
@@ -61,37 +35,38 @@ export const authOptions: NextAuthOptions = {
         }
 
         return {
-          id: user.id,
+          id: user._id.toString(),
           email: user.email,
           name: user.name,
-          role: user.role
+          role: user.role,
         };
-      }
-    })
+      },
+    }),
   ],
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = user.role;
         token.id = user.id;
+        token.role = user.role;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.role = token.role as "admin" | "user";
         session.user.id = token.id as string;
+        session.user.role = token.role as string;
       }
       return session;
-    }
+    },
   },
   pages: {
-    signIn: "/auth/signin",
-    error: "/auth/error",
+    signIn: "/sign-in",
+    signOut: "/",
+    error: "/sign-in",
   },
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60,
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
-
